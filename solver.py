@@ -227,35 +227,7 @@ def bidirectional_search(start_node: Node, goal_node: Node) -> Optional[List[Tup
                     bq.append(neighbor)
     return None
     
-    
-    def expand_frontier(queue: deque, visited: Dict[Node, Node], 
-                       other_visited: Dict[Node, Node]) -> Optional[Node]:
-        if not queue:
-            return None
-            
-        current = queue.popleft()
-        for neighbor in current.neighbors:
-            if neighbor in other_visited:
-                return neighbor  # Meeting point found
-            if neighbor not in visited:
-                visited[neighbor] = current
-                queue.append(neighbor)
-        return None
-    
-    while forward_queue and backward_queue:
-        if time.time() - start_time > TIMEOUT_SECONDS:
-            raise MazeSolverError("Bidirectional search timeout")
-            
-        # Alternate between frontiers
-        meeting_node = expand_frontier(forward_queue, forward_visited, backward_visited)
-        if meeting_node:
-            return reconstruct_bidirectional_path(meeting_node, forward_visited, backward_visited)
-                
-        meeting_node = expand_frontier(backward_queue, backward_visited, forward_visited)
-        if meeting_node:
-            return reconstruct_bidirectional_path(meeting_node, forward_visited, backward_visited)
-                
-    return None
+
 
 def reconstruct_bidirectional_path(meeting_node: Node, 
                                  forward_visited: Dict[Node, Node],
@@ -285,7 +257,6 @@ def simulated_annealing(start_node, goal_node, temperature=1.0, cooling_rate=0.9
     - The 'cost' is the manhattan_distance to the goal.
     - We randomly choose a neighbor and possibly move there.
     Returns a list of (row, col) from start to goal (the path traveled), or None if not reached.
-
     Steps (suggested):
       1. Start with 'current' = start_node, compute cost = manhattan_distance(current, goal_node).
       2. Pick a random neighbor. Compute next_cost.
@@ -304,13 +275,11 @@ def simulated_annealing(start_node, goal_node, temperature=1.0, cooling_rate=0.9
     while temperature > min_temperature:
         if curr_node == goal_node:
             return path 
-
         if not curr_node.neighbors:
             break  
         next_node = random.choice(curr_node.neighbors)
         
         next_cost = manhattan_distance(next_node, goal_node)
-
         cost_diff = next_cost - curr_cost
         if cost_diff < 0 or random.random() < math.exp(-cost_diff / temperature):
             curr_node = next_node
