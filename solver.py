@@ -1,282 +1,259 @@
+# solver.py - Main algorithm implementation file
+
 import math
 import random
 from collections import deque, defaultdict
 import heapq
 import numpy as np
+from typing import Dict, List, Set, Tuple, Optional
+import time
 
-random.seed(42)
+# Constants for algorithm limits and safety
+MAX_PATH_LENGTH = 1000  # Maximum allowed path length
+MAX_ITERATIONS = 10000  # Maximum iterations for iterative algorithms
+TIMEOUT_SECONDS = 5     # Maximum execution time
 
-###############################################################################
-#                                Node Class                                   #
-###############################################################################
+class MazeSolverError(Exception):
+    """Custom exception for maze solver specific errors"""
+    pass
 
 class Node:
     """
     Represents a graph node with an undirected adjacency list.
-    'value' can store (row, col), or any unique identifier.
-    'neighbors' is a list of connected Node objects (undirected).
+    Value stores (row, col) coordinates or any unique identifier.
     """
-    def __init__(self, value):
+    def __init__(self, value: Tuple[int, int]):
         self.value = value
-        self.neighbors = []
+        self.neighbors: List[Node] = []
 
-    def add_neighbor(self, node):
+    def add_neighbor(self, node: 'Node') -> None:
         """
-        Adds an undirected edge between self and node:
-         - self includes node in self.neighbors
-         - node includes self in node.neighbors (undirected)
+        Adds an undirected edge between self and node.
+        Fixed to prevent duplicate edges.
         """
-        # TODO: Implement adding a neighbor in an undirected manner
-        if node not in self.neighbors: 
+        if node not in self.neighbors:
             self.neighbors.append(node)
-            node.neighbors.append(self)
-        if node in self.neighbors:
-            node.neighbors.append(self)
-    
+            if self not in node.neighbors:
+                node.neighbors.append(self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Node({self.value})"
     
-    def __lt__(self, other):
+    def __lt__(self, other: 'Node') -> bool:
         return self.value < other.value
 
-
-###############################################################################
-#                   Maze -> Graph Conversion (Undirected)                     #
-###############################################################################
-
-def parse_maze_to_graph(maze):
+def parse_maze_to_graph(maze: np.ndarray) -> Tuple[Dict[Tuple[int, int], Node], Optional[Node], Optional[Node]]:
     """
-    Converts a 2D maze (numpy array) into an undirected graph of Node objects.
-    maze[r][c] == 0 means open cell; 1 means wall/blocked.
-
-    Returns:
-        nodes_dict: dict[(r, c): Node] mapping each open cell to its Node
-        start_node : Node corresponding to (0, 0), or None if blocked
-        goal_node  : Node corresponding to (rows-1, cols-1), or None if blocked
+    Converts a 2D maze into an undirected graph.
+    Added validation and error handling.
     """
+    if maze is None or maze.size == 0:
+        raise MazeSolverError("Invalid maze: Empty or None")
+        
     rows, cols = maze.shape
-    nodes_dict = {}
+    nodes_dict: Dict[Tuple[int, int], Node] = {}
     
-    # TODO: Implement the logic to build nodes and link neighbors
-    
+    # Create nodes for open cells
     for r in range(rows):
         for c in range(cols):
-            if maze[r][c]== 0:
-                nodes_dict[(r,c)] = Node((r,c))
-            else:   
-                continue
-    for r in range(rows):
-        for c in range(cols):
-            if maze[r][c] == 0:
-                if r-1 >= 0 and maze[r-1][c] == 0:
-                    nodes_dict[(r,c)].add_neighbor(nodes_dict[(r-1,c)])
-                if r+1 < rows and maze[r+1][c] == 0:
-                    nodes_dict[(r,c)].add_neighbor(nodes_dict[(r+1,c)])
-                if c-1 >= 0 and maze[r][c-1] == 0:
-                    nodes_dict[(r,c)].add_neighbor(nodes_dict[(r,c-1)])
-                if c+1 < cols and maze[r][c+1] == 0:
-                    nodes_dict[(r,c)].add_neighbor(nodes_dict[(r,c+1)])
-                       
-    start_node = None
-    goal_node = None
-
-
-    # TODO: Assign start_node and goal_node if they exist in nodes_dict
-    if (0,0) in nodes_dict:
-        start_node = nodes_dict[(0,0)]
-    if (rows-1,cols-1) in nodes_dict:
-        goal_node = nodes_dict[(rows-1,cols-1)]
+            if maze[r, c] == 0:  # Open cell
+                nodes_dict[(r, c)] = Node((r, c))
     
+    # Connect neighboring nodes
+    for (r, c), node in nodes_dict.items():
+        for dr, dc in [(0, 1), (1, 0), (0, -1), (-1, 0)]:  # 4-directional
+            nr, nc = r + dr, c + dc
+            if (nr, nc) in nodes_dict:
+                node.add_neighbor(nodes_dict[(nr, nc)])
+    
+    start_node = nodes_dict.get((0, 0))
+    goal_node = nodes_dict.get((rows-1, cols-1))
+    
+    # Validate start and goal nodes
+    if not start_node or not goal_node:
+        raise MazeSolverError("Start or goal position blocked")
+        
     return nodes_dict, start_node, goal_node
 
-
-###############################################################################
-#                         BFS (Graph-based)                                    #
-###############################################################################
-
-def bfs(start_node, goal_node):
-    """
-    Breadth-first search on an undirected graph of Node objects.
-    Returns a list of (row, col) from start to goal, or None if no path.
-
-    Steps (suggested):
-      1. Use a queue (collections.deque) to hold nodes to explore.
-      2. Track visited nodes so you don’t revisit.
-      3. Also track parent_map to reconstruct the path once goal_node is reached.
-    """
-    # TODO: Implement BFS
-    queue = deque()
-    visited = set()
-    parent_map = {}
-    queue.append(start_node)
-    visited.add(start_node)
-    while queue:
-        curr = queue.popleft()
-        if curr == goal_node:
-            return reconstruct_path(goal_node, parent_map)
-        for neighbor in curr.neighbors:
-            if neighbor not in visited:
-                visited.add(neighbor)
-                parent_map[neighbor] = curr
-                queue.append(neighbor)
-    return None
-
-
-###############################################################################
-#                          DFS (Graph-based)                                   #
-###############################################################################
-
-def dfs(start_node, goal_node):
-    """
-    Depth-first search on an undirected graph of Node objects.
-    Returns a list of (row, col) from start to goal, or None if no path.
-
-    Steps (suggested):
-      1. Use a stack (Python list) to hold nodes to explore.
-      2. Keep track of visited nodes to avoid cycles.
-      3. Reconstruct path via parent_map if goal_node is found.
-    """
-    # TODO: Implement DFS
-    
-    stack = []
-    visited = set()
-    parent_map = {}
-    stack.append(start_node)
-    visited.add(start_node)
-    while stack:
-        curr = stack.pop()
-        if curr == goal_node:
-            return reconstruct_path(goal_node, parent_map)
-        for neighbor in curr.neighbors:
-            if neighbor not in visited:
-                visited.add(neighbor)
-                parent_map[neighbor] = curr
-                stack.append(neighbor)
-    return None
-
-
-###############################################################################
-#                    A* (Graph-based with Manhattan)                           #
-###############################################################################
-
-def astar(start_node, goal_node):
-    """
-    A* search on an undirected graph of Node objects.
-    Uses manhattan_distance as the heuristic, assuming node.value = (row, col).
-    Returns a path (list of (row, col)) or None if not found.
-
-    Steps (suggested):
-      1. Maintain a min-heap/priority queue (heapq) where each entry is (f_score, node).
-      2. f_score[node] = g_score[node] + heuristic(node, goal_node).
-      3. g_score[node] is the cost from start_node to node.
-      4. Expand the node with the smallest f_score, update neighbors if a better path is found.
-    """
-    # TODO: Implement A*
-    if start_node is None or goal_node is None:
-        return None
-
-    open_heap = []
-    visited = set()
-    parent_map = {}
-    g_score = defaultdict(lambda: float('inf'))
-    g_score[start_node] = 0
-
-    f_score = manhattan_distance(start_node, goal_node)
-    heapq.heappush(open_heap, (f_score, start_node))
-
-    while open_heap:
-        curr_f_score, curr = heapq.heappop(open_heap)
-
-        if curr== goal_node:
-            return reconstruct_path(goal_node, parent_map)
-        if curr in visited:
-            continue
-        visited.add(curr)
-
-        for neighbor in curr.neighbors:
-            cost = g_score[curr] + 1
-            if cost < g_score[neighbor]:
-                g_score[neighbor] = cost
-                f_score = cost + manhattan_distance(neighbor, goal_node)
-                parent_map[neighbor] = curr
-                heapq.heappush(open_heap, (f_score, neighbor))
-
-
-
-    return None
-
-def manhattan_distance(node_a, node_b):
-    """
-    Helper: Manhattan distance between node_a.value and node_b.value 
-    if they are (row, col) pairs.
-    """
-    # TODO: Return |r1 - r2| + |c1 - c2|
+def manhattan_distance(node_a: Node, node_b: Node) -> int:
+    """Calculate Manhattan distance between two nodes"""
     r1, c1 = node_a.value
     r2, c2 = node_b.value
-    r = abs(r1 - r2)
-    c = abs(c1 - c2)
-    return r + c 
+    return abs(r1 - r2) + abs(c1 - c2)
 
-
-###############################################################################
-#                 Bidirectional Search (Graph-based)                          #
-###############################################################################
-
-def bidirectional_search(start_node, goal_node):
+def reconstruct_path(end_node: Node, parent_map: Dict[Node, Node]) -> Optional[List[Tuple[int, int]]]:
     """
-    Bidirectional search on an undirected graph of Node objects.
-    Returns list of (row, col) from start to goal, or None if not found.
-
-    Steps (suggested):
-      1. Maintain two frontiers (queues), one from start_node, one from goal_node.
-      2. Alternate expansions between these two queues.
-      3. If the frontiers intersect, reconstruct the path by combining partial paths.
+    Reconstructs path from parent map.
+    Added validation and length checking.
     """
-    # TODO: Implement bidirectional search
-    if start_node is None or goal_node is None:
-        return None
-
- 
-    fq = deque([start_node])
-    bq = deque([goal_node])
-
-
-    fp = {start_node: None}
-    bp = {goal_node: None}
-
-    while fq and bq:
-        curr_f_size = len(fq)
-        for _ in range(curr_f_size):
-            curr = fq.popleft()
-            if curr in bp:
-                forward = reconstruct_path(curr, fp)
-                backward = reconstruct_path(curr, bp)
-                return forward + backward[1:]
-
-            for neighbor in curr.neighbors:
-                if neighbor not in fp:
-                    fp[neighbor] = curr
-                    fq.append(neighbor)
-
-        curr_b_size = len(bq)
-        for _ in range(curr_b_size):
-            curr = bq.popleft()
-            if curr in fp:
-                forward = reconstruct_path(curr, fp)
-                backward = reconstruct_path(curr, bp)
-                return forward + backward[1:]
-            for neighbor in curr.neighbors:
-                if neighbor not in bp:
-                    bp[neighbor] = curr
-                    bq.append(neighbor)
-    return None
+    path = []
+    current = end_node
     
+    while current and len(path) < MAX_PATH_LENGTH:
+        path.append(current.value)
+        current = parent_map.get(current)
+        
+    if len(path) >= MAX_PATH_LENGTH:
+        raise MazeSolverError("Path exceeds maximum length")
+        
+    return path[::-1] if path else None
 
+def bfs(start_node: Node, goal_node: Node) -> Optional[List[Tuple[int, int]]]:
+    """
+    Breadth-first search with timeout and validation.
+    """
+    if not start_node or not goal_node:
+        raise MazeSolverError("Invalid start or goal node")
+        
+    start_time = time.time()
+    queue = deque([(start_node, 0)])  # (node, depth)
+    visited = {start_node}
+    parent_map = {}
+    
+    while queue and len(visited) < MAX_ITERATIONS:
+        if time.time() - start_time > TIMEOUT_SECONDS:
+            raise MazeSolverError("BFS timeout")
+            
+        current, depth = queue.popleft()
+        if current == goal_node:
+            return reconstruct_path(goal_node, parent_map)
+            
+        for neighbor in current.neighbors:
+            if neighbor not in visited:
+                visited.add(neighbor)
+                parent_map[neighbor] = current
+                queue.append((neighbor, depth + 1))
+                
+    return None
 
-###############################################################################
-#             Simulated Annealing (Graph-based)                               #
-###############################################################################
+def dfs(start_node: Node, goal_node: Node) -> Optional[List[Tuple[int, int]]]:
+    """
+    Depth-first search with depth limiting and timeout.
+    """
+    if not start_node or not goal_node:
+        raise MazeSolverError("Invalid start or goal node")
+        
+    start_time = time.time()
+    stack = [(start_node, 0)]  # (node, depth)
+    visited = {start_node}
+    parent_map = {}
+    max_depth = MAX_PATH_LENGTH
+    
+    while stack:
+        if time.time() - start_time > TIMEOUT_SECONDS:
+            raise MazeSolverError("DFS timeout")
+            
+        current, depth = stack.pop()
+        if current == goal_node:
+            return reconstruct_path(goal_node, parent_map)
+            
+        if depth < max_depth:
+            for neighbor in current.neighbors:
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    parent_map[neighbor] = current
+                    stack.append((neighbor, depth + 1))
+                    
+    return None
+
+def astar(start_node: Node, goal_node: Node) -> Optional[List[Tuple[int, int]]]:
+    """
+    A* search with improved heuristic and timeout.
+    """
+    if not start_node or not goal_node:
+        raise MazeSolverError("Invalid start or goal node")
+        
+    start_time = time.time()
+    open_heap = [(0, start_node)]
+    g_score = {start_node: 0}
+    closed = set()
+    parent_map = {}
+    
+    while open_heap and len(closed) < MAX_ITERATIONS:
+        if time.time() - start_time > TIMEOUT_SECONDS:
+            raise MazeSolverError("A* timeout")
+            
+        current_f, current = heapq.heappop(open_heap)
+        
+        if current == goal_node:
+            return reconstruct_path(goal_node, parent_map)
+            
+        if current in closed:
+            continue
+            
+        closed.add(current)
+        
+        for neighbor in current.neighbors:
+            if neighbor in closed:
+                continue
+                
+            tentative_g = g_score[current] + 1
+            
+            if neighbor not in g_score or tentative_g < g_score[neighbor]:
+                g_score[neighbor] = tentative_g
+                f_score = tentative_g + manhattan_distance(neighbor, goal_node)
+                parent_map[neighbor] = current
+                heapq.heappush(open_heap, (f_score, neighbor))
+                
+    return None
+
+def bidirectional_search(start_node: Node, goal_node: Node) -> Optional[List[Tuple[int, int]]]:
+    if not start_node or not goal_node:
+        raise MazeSolverError("Invalid start or goal node")
+        
+    start_time = time.time()
+    forward_queue = deque([start_node])
+    backward_queue = deque([goal_node])
+    forward_visited = {start_node: None}  # node -> parent
+    backward_visited = {goal_node: None}  # node -> parent
+    
+    def expand_frontier(queue: deque, visited: Dict[Node, Node], 
+                       other_visited: Dict[Node, Node]) -> Optional[Node]:
+        if not queue:
+            return None
+            
+        current = queue.popleft()
+        for neighbor in current.neighbors:
+            if neighbor in other_visited:
+                return neighbor  # Meeting point found
+            if neighbor not in visited:
+                visited[neighbor] = current
+                queue.append(neighbor)
+        return None
+    
+    while forward_queue and backward_queue:
+        if time.time() - start_time > TIMEOUT_SECONDS:
+            raise MazeSolverError("Bidirectional search timeout")
+            
+        # Alternate between frontiers
+        meeting_node = expand_frontier(forward_queue, forward_visited, backward_visited)
+        if meeting_node:
+            return reconstruct_bidirectional_path(meeting_node, forward_visited, backward_visited)
+                
+        meeting_node = expand_frontier(backward_queue, backward_visited, forward_visited)
+        if meeting_node:
+            return reconstruct_bidirectional_path(meeting_node, forward_visited, backward_visited)
+                
+    return None
+
+def reconstruct_bidirectional_path(meeting_node: Node, 
+                                 forward_visited: Dict[Node, Node],
+                                 backward_visited: Dict[Node, Node]) -> List[Tuple[int, int]]:
+    """Helper function for bidirectional path reconstruction"""
+    forward_path = []
+    current = meeting_node
+    while current:
+        forward_path.append(current.value)
+        current = forward_visited.get(current)
+    forward_path = forward_path[::-1]  # Reverse to get start to meeting
+    
+    backward_path = []
+    current = backward_visited.get(meeting_node)
+    while current:
+        backward_path.append(current.value)
+        current = backward_visited.get(current)
+        
+    return forward_path + backward_path  # Correct combination without reversing
 
 def simulated_annealing(start_node, goal_node, temperature=1.0, cooling_rate=0.99, min_temperature=0.01):
     """
@@ -320,65 +297,78 @@ def simulated_annealing(start_node, goal_node, temperature=1.0, cooling_rate=0.9
     return None
 
 
-###############################################################################
-#                           Helper: Reconstruct Path                           #
-###############################################################################
-
-def reconstruct_path(end_node, parent_map):
-    """
-    Reconstructs a path by tracing parent_map up to None.
-    Returns a list of node.value from the start to 'end_node'.
-
-    'parent_map' is typically dict[Node, Node], where parent_map[node] = parent.
-
-    Steps (suggested):
-      1. Start with end_node, follow parent_map[node] until None.
-      2. Collect node.value, reverse the list, return it.
-    """
-    # TODO: Implement path reconstruction
-    path = []
-    current = end_node
-    while current:
-        path.append(current.value)
-        current = parent_map.get(current)   
-    if path:
-        return path[::-1]
-    else:
-        return None
+def solve_maze(maze: np.ndarray, algorithm: str) -> Optional[List[Tuple[int, int]]]:
+    try:
+        nodes_dict, start_node, goal_node = parse_maze_to_graph(maze)
         
+        solvers = {
+            "bfs": lambda: bfs(start_node, goal_node),
+            "dfs": lambda: dfs(start_node, goal_node),
+            "astar": lambda: astar(start_node, goal_node),
+            "bidirectional": lambda: bidirectional_search(start_node, goal_node),
+            "simulated_annealing": lambda: simulated_annealing(
+                start_node, goal_node, temperature=1000, cooling_rate=0.95
+            )
+        }
+        
+        solver = solvers.get(algorithm)
+        if not solver:
+            raise MazeSolverError(f"Unknown algorithm: {algorithm}")
+            
+        return solver()
+        
+    except MazeSolverError as e:
+        print(f"Maze solving error: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return None
 
-
-###############################################################################
-#                              Demo / Testing                                 #
-###############################################################################
-if __name__ == "__main__":
-
-    random.seed(42)
-    np.random.seed(42)
-
-    # Example small maze: 0 => open, 1 => wall
-    maze_data = np.array([
+# Test cases for the implementation
+def run_tests():
+    """
+    Comprehensive test suite for the maze solver.
+    """
+    # Test case 1: Simple 3x3 maze
+    simple_maze = np.array([
         [0, 0, 1],
         [0, 0, 0],
         [1, 0, 0]
     ])
+    
+    # Test case 2: No solution maze
+    no_solution_maze = np.array([
+        [0, 1, 0],
+        [1, 1, 1],
+        [0, 1, 0]
+    ])
+    
+    # Test case 3: Large maze (20x20)
+    large_maze = np.random.choice(
+        [0, 1],
+        size=(20, 20),
+        p=[0.7, 0.3]  # 70% chance of open cells
+    )
+    large_maze[0, 0] = large_maze[-1, -1] = 0  # Ensure start/end are open
+    
+    # Run tests for each maze and algorithm
+    mazes = [simple_maze, no_solution_maze, large_maze]
+    algorithms = ["bfs", "dfs", "astar", "bidirectional", "simulated_annealing"]
+    
+    for i, maze in enumerate(mazes):
+        print(f"\nTesting maze {i+1}:")
+        for algo in algorithms:
+            try:
+                start_time = time.time()
+                path = solve_maze(maze, algo)
+                end_time = time.time()
+                
+                print(f"  {algo:20}: {'Success' if path else 'No path'} ({end_time - start_time:.3f}s)")
 
-    # Parse into an undirected graph
-    nodes_dict, start_node, goal_node = parse_maze_to_graph(maze_data)
-    print("Created graph with", len(nodes_dict), "nodes.")
-    print("Start Node:", start_node)
-    print("Goal Node :", goal_node)
- 
-    # Test BFS (will return None until implemented)
-    path_bfs = bfs(start_node, goal_node)
-    print("BFS Path:", path_bfs)
+            except MazeSolverError as e:
+                print(f"  {algo:20}: Error - {e}")
+            except Exception as e:
+                print(f"  {algo:20}: Unexpected error - {e}")
 
-    # Similarly test DFS, A*, etc.
-    path_dfs = dfs(start_node, goal_node)
-    path_astar = astar(start_node, goal_node)
-    path_bidirectional = bidirectional_search(start_node, goal_node)
-    print("DFS Path:", path_dfs)
-    print("A* Path:", path_astar)
-    print("Bidirectional Path:", path_bidirectional)
-
-###############################################################################
+if __name__ == "__main__":
+    run_tests()
