@@ -18,23 +18,14 @@ class MazeSolverError(Exception):
     pass
 
 class Node:
-    """
-    Represents a graph node with an undirected adjacency list.
-    Value stores (row, col) coordinates or any unique identifier.
-    """
     def __init__(self, value: Tuple[int, int]):
         self.value = value
-        self.neighbors: List[Node] = []
+        self.neighbors: Set['Node'] = set()
 
     def add_neighbor(self, node: 'Node') -> None:
-        """
-        Adds an undirected edge between self and node.
-        Fixed to prevent duplicate edges.
-        """
-        if node not in self.neighbors:
-            self.neighbors.append(node)
-            if self not in node.neighbors:
-                node.neighbors.append(self)
+        self.neighbors.add(node)
+        node.neighbors.add(self)
+
 
     def __repr__(self) -> str:
         return f"Node({self.value})"
@@ -198,14 +189,44 @@ def astar(start_node: Node, goal_node: Node) -> Optional[List[Tuple[int, int]]]:
     return None
 
 def bidirectional_search(start_node: Node, goal_node: Node) -> Optional[List[Tuple[int, int]]]:
-    if not start_node or not goal_node:
-        raise MazeSolverError("Invalid start or goal node")
-        
-    start_time = time.time()
-    forward_queue = deque([start_node])
-    backward_queue = deque([goal_node])
-    forward_visited = {start_node: None}  # node -> parent
-    backward_visited = {goal_node: None}  # node -> parent
+    if start_node is None or goal_node is None:
+        return None
+
+ 
+    fq = deque([start_node])
+    bq = deque([goal_node])
+
+
+    fp = {start_node: None}
+    bp = {goal_node: None}
+
+    while fq and bq:
+        curr_f_size = len(fq)
+        for _ in range(curr_f_size):
+            curr = fq.popleft()
+            if curr in bp:
+                forward = reconstruct_path(curr, fp)
+                backward = reconstruct_path(curr, bp)
+                return forward + backward[1:]
+
+            for neighbor in curr.neighbors:
+                if neighbor not in fp:
+                    fp[neighbor] = curr
+                    fq.append(neighbor)
+
+        curr_b_size = len(bq)
+        for _ in range(curr_b_size):
+            curr = bq.popleft()
+            if curr in fp:
+                forward = reconstruct_path(curr, fp)
+                backward = reconstruct_path(curr, bp)
+                return forward + backward[1:]
+            for neighbor in curr.neighbors:
+                if neighbor not in bp:
+                    bp[neighbor] = curr
+                    bq.append(neighbor)
+    return None
+    
     
     def expand_frontier(queue: deque, visited: Dict[Node, Node], 
                        other_visited: Dict[Node, Node]) -> Optional[Node]:
@@ -239,21 +260,24 @@ def bidirectional_search(start_node: Node, goal_node: Node) -> Optional[List[Tup
 def reconstruct_bidirectional_path(meeting_node: Node, 
                                  forward_visited: Dict[Node, Node],
                                  backward_visited: Dict[Node, Node]) -> List[Tuple[int, int]]:
-    """Helper function for bidirectional path reconstruction"""
+    """Reconstructs the full path from start to goal through the meeting node."""
+
     forward_path = []
     current = meeting_node
     while current:
         forward_path.append(current.value)
         current = forward_visited.get(current)
-    forward_path = forward_path[::-1]  # Reverse to get start to meeting
-    
+    forward_path = forward_path[::-1] 
+
     backward_path = []
     current = backward_visited.get(meeting_node)
     while current:
         backward_path.append(current.value)
         current = backward_visited.get(current)
-        
-    return forward_path + backward_path  # Correct combination without reversing
+    # No reversal here since backward_visited stores parent references from goal
+    
+    # Combine paths (exclude meeting_node duplicate)
+    return forward_path[::-1] + backward_path[1:]
 
 def simulated_annealing(start_node, goal_node, temperature=1.0, cooling_rate=0.99, min_temperature=0.01):
     """
