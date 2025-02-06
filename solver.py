@@ -9,9 +9,9 @@ from typing import Dict, List, Set, Tuple, Optional
 import time
 
 # Constants for algorithm limits and safety
-MAX_PATH_LENGTH = 1000  # Maximum allowed path length
-MAX_ITERATIONS = 10000  # Maximum iterations for iterative algorithms
-TIMEOUT_SECONDS = 5     # Maximum execution time
+MAX_PATH_LENGTH = 10000  # Maximum allowed path length
+MAX_ITERATIONS = 100000  # Maximum iterations for iterative algorithms
+TIMEOUT_SECONDS = 7     # Maximum execution time
 
 class MazeSolverError(Exception):
     """Custom exception for maze solver specific errors"""
@@ -52,7 +52,7 @@ def parse_maze_to_graph(maze: np.ndarray) -> Tuple[Dict[Tuple[int, int], Node], 
     
     # Connect neighboring nodes
     for (r, c), node in nodes_dict.items():
-        for dr, dc in [(0, 1), (1, 0), (0, -1), (-1, 0)]:  # 4-directional
+        for dr, dc in [(0, 1), (1, 0), (0, -1), (-1, 0)]:  
             nr, nc = r + dr, c + dc
             if (nr, nc) in nodes_dict:
                 node.add_neighbor(nodes_dict[(nr, nc)])
@@ -251,20 +251,7 @@ def reconstruct_bidirectional_path(meeting_node: Node,
     # Combine paths (exclude meeting_node duplicate)
     return forward_path[::-1] + backward_path[1:]
 
-def simulated_annealing(start_node, goal_node, temperature=1.0, cooling_rate=0.99, min_temperature=0.01):
-    """
-    A basic simulated annealing approach on an undirected graph of Node objects.
-    - The 'cost' is the manhattan_distance to the goal.
-    - We randomly choose a neighbor and possibly move there.
-    Returns a list of (row, col) from start to goal (the path traveled), or None if not reached.
-    Steps (suggested):
-      1. Start with 'current' = start_node, compute cost = manhattan_distance(current, goal_node).
-      2. Pick a random neighbor. Compute next_cost.
-      3. If next_cost < current_cost, move. Otherwise, move with probability e^(-cost_diff / temperature).
-      4. Decrease temperature each step by cooling_rate until below min_temperature or we reach goal_node.
-    """
-    # TODO: Implement simulated annealing
-    
+def simulated_annealing(start_node, goal_node, temperature=1.0, cooling_rate=0.99, min_temperature=0.001):
     if start_node is None or goal_node is None:
         return None
     
@@ -273,23 +260,56 @@ def simulated_annealing(start_node, goal_node, temperature=1.0, cooling_rate=0.9
     path = [curr_node.value] 
     
     while temperature > min_temperature:
-        if curr_node == goal_node:
-            return path 
-        if not curr_node.neighbors:
-            break  
-        next_node = random.choice(curr_node.neighbors)
-        
-        next_cost = manhattan_distance(next_node, goal_node)
-        cost_diff = next_cost - curr_cost
-        if cost_diff < 0 or random.random() < math.exp(-cost_diff / temperature):
-            curr_node = next_node
-            curr_cost = next_cost
-            path.append(curr_node.value)
+        for _ in range(750):
+            if curr_node == goal_node:
+                return path 
+            if not curr_node.neighbors:
+                break  
+            next_node = random.choice(list(curr_node.neighbors))
+            next_cost = manhattan_distance(next_node, goal_node)
+            cost_diff = next_cost - curr_cost
+            if cost_diff < 0 or random.random() < math.exp(-cost_diff / temperature):
+                curr_node = next_node
+                curr_cost = next_cost
+                path.append(curr_node.value)
         temperature *= cooling_rate
+    
+    return path if curr_node == goal_node else None
+
+
+def dijkstra(start_node, goal_node):
+    """
+    Dijkstra's algorithm to find the shortest path in an unweighted graph.
+    Returns a list of (row, col) positions representing the path from start to goal, or None if not found.
+    """
+    import heapq
+
+    if start_node is None or goal_node is None:
+        return None
+
+    # Distance dictionary with start node having distance 0
+    dist = {start_node: 0}
+    # Parent map to reconstruct the path
+    parent = {}
+    # Priority queue storing (distance, node)
+    heap = [(0, start_node)]
+    
+    while heap:
+        current_dist, current = heapq.heappop(heap)
+        if current == goal_node:
+            return reconstruct_path(goal_node, parent)
+        
+        for neighbor in current.neighbors:
+            alt = current_dist + 1  # each edge has weight 1
+            if neighbor not in dist or alt < dist[neighbor]:
+                dist[neighbor] = alt
+                parent[neighbor] = current
+                heapq.heappush(heap, (alt, neighbor))
     
     return None
 
 
+###############################################################################
 def solve_maze(maze: np.ndarray, algorithm: str) -> Optional[List[Tuple[int, int]]]:
     try:
         nodes_dict, start_node, goal_node = parse_maze_to_graph(maze)
@@ -299,9 +319,10 @@ def solve_maze(maze: np.ndarray, algorithm: str) -> Optional[List[Tuple[int, int
             "dfs": lambda: dfs(start_node, goal_node),
             "astar": lambda: astar(start_node, goal_node),
             "bidirectional": lambda: bidirectional_search(start_node, goal_node),
-            "simulated_annealing": lambda: simulated_annealing(
-                start_node, goal_node, temperature=1000, cooling_rate=0.95
-            )
+            "simulated_annealing": lambda: simulated_annealing(start_node, goal_node, temperature=1.15, cooling_rate=0.9999, min_temperature=0.0005),
+            "dijkstra": lambda: dijkstra(start_node, goal_node)
+
+
         }
         
         solver = solvers.get(algorithm)
@@ -346,7 +367,7 @@ def run_tests():
     
     # Run tests for each maze and algorithm
     mazes = [simple_maze, no_solution_maze, large_maze]
-    algorithms = ["bfs", "dfs", "astar", "bidirectional", "simulated_annealing"]
+    algorithms = ["bfs", "dfs", "astar", "bidirectional", "simulated_annealing", "dijkstra"]
     
     for i, maze in enumerate(mazes):
         print(f"\nTesting maze {i+1}:")

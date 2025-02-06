@@ -40,7 +40,7 @@ class UIState:
         self.hover_buttons: Set[int] = set()
         self.dropdown_open = False
         self.selected_algorithm = "bfs"
-        self.algorithms = ["bfs", "dfs", "astar", "bidirectional", "simulated_annealing"]
+        self.algorithms = ["bfs", "dfs", "astar", "bidirectional", "simulated_annealing", "dijkstra"]
 
     def show_error(self, message: str, duration: float = 3.0):
         """Display error message for specified duration"""
