@@ -1,7 +1,7 @@
 # PathFinders
- This project is a visually stunning and interactive application that generates random mazes and allows users to solve them using a variety of pathfinding algorithms. Whether you're a developer looking to understand algorithm implementations or simply enjoy engaging visualizations, this project has something for you.
+ This project is a visually engaging and interactive program that generates random mazes and allows usthe user to solve them using a variety of pathfinding algorithms.
 
-## 📈 Features
+## Features
 
 - **Random Maze Generation**
   - Creates new mazes with guaranteed solvability.
@@ -13,6 +13,7 @@
   - **A* Search**
   - **Bidirectional Search**
   - **Simulated Annealing**
+  - **Dijkstra**
 
 - **Interactive UI**
   - Select and switch between different algorithms seamlessly.

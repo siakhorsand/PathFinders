@@ -19,7 +19,7 @@ FPS = 60
 class Colors:
     DARK_GRADIENT = (18, 23, 29)
     MAZE_BG = (34, 41, 49)
-    WALL_COLOR = (255, 60, 60)  # Neon red
+    WALL_COLOR = (30, 0, 190)  # Neon red
     PATH_COLOR = (100, 255, 220)
     START_COLOR = (100, 255, 150)
     GOAL_COLOR = (255, 100, 150)
@@ -30,7 +30,7 @@ class Colors:
     ERROR_COLOR = (255, 80, 80)
 
 class UIState:
-    """Manages UI state and transitions"""
+
     def __init__(self):
         self.solving = False
         self.error_message: Optional[str] = None
@@ -43,13 +43,13 @@ class UIState:
         self.algorithms = ["bfs", "dfs", "astar", "bidirectional", "simulated_annealing", "dijkstra"]
 
     def show_error(self, message: str, duration: float = 3.0):
-        """Display error message for specified duration"""
+
         self.error_message = message
         self.error_timer = duration
         self.solving = False
 
     def update(self, dt: float):
-        """Update UI state with time delta"""
+
         if self.error_timer > 0:
             self.error_timer -= dt
             if self.error_timer <= 0:
@@ -61,7 +61,7 @@ class UIState:
                 self.solving = False
 
 class MazeVisualizer:
-    """Handles maze visualization and user interaction"""
+
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_SIZE, SCREEN_SIZE))
@@ -82,7 +82,7 @@ class MazeVisualizer:
         self.glow_surfaces = self.create_glow_surfaces()
 
     def generate_maze(self) -> np.ndarray:
-        """Generate a new random maze with guaranteed start/end access"""
+ 
         maze = np.random.choice([0, 1], size=(GRID_SIZE, GRID_SIZE), p=[0.7, 0.3])
         maze[0, 0] = maze[GRID_SIZE-1, GRID_SIZE-1] = 0
         # Ensure path exists between start and end
@@ -90,7 +90,7 @@ class MazeVisualizer:
         return maze
 
     def ensure_path_exists(self, maze: np.ndarray):
-        """Ensure there's at least one valid path through the maze"""
+
         if not solve_maze(maze, "bfs"):
             # Create a simple path if none exists
             for i in range(GRID_SIZE):
@@ -99,7 +99,7 @@ class MazeVisualizer:
                 maze[GRID_SIZE-1, j] = 0
 
     def create_glow_surfaces(self) -> Dict[str, pygame.Surface]:
-        """Create pre-rendered glow effects for better performance"""
+
         def create_glow(color: Tuple[int, ...], radius: int) -> pygame.Surface:
             surface = pygame.Surface((radius*2, radius*2), pygame.SRCALPHA)
             for i in range(radius, 0, -1):
@@ -109,15 +109,13 @@ class MazeVisualizer:
 
         return {
             'start': create_glow(Colors.START_COLOR, 15),
-            'goal': create_glow(Colors.GOAL_COLOR, 15),
+            'goal': create_glow(Colors.GOAL_COLOR, 125),
             'path': create_glow(Colors.PATH_COLOR, 15)
         }
 
     def draw_cyber_background(self):
-        """Draw cyberpunk-style background with enhanced grid effects"""
         self.screen.fill(Colors.DARK_GRADIENT)
         
-        # Draw perspective grid
         vanishing_point = (SCREEN_SIZE // 2, SCREEN_SIZE // 2)
         for i in range(0, SCREEN_SIZE, BLOCK_SIZE):
             alpha = 30 if i % (BLOCK_SIZE*5) == 0 else 10
@@ -135,7 +133,6 @@ class MazeVisualizer:
                            (start_x + (start_x - vanishing_point[0])//4, SCREEN_SIZE))
 
     def draw_maze(self):
-        """Draw maze with enhanced visual effects"""
         for y in range(GRID_SIZE):
             for x in range(GRID_SIZE):
                 rect = pygame.Rect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE)
@@ -144,7 +141,7 @@ class MazeVisualizer:
                     pygame.draw.rect(self.screen, Colors.MAZE_BG, rect, border_radius=3)
                 else:  # Wall with neon effect
                     pygame.draw.rect(self.screen, Colors.WALL_COLOR, 
-                                   rect.inflate(-2, -2), border_radius=2)
+                                   rect.inflate(-2, -2), border_radius=10)
                     glow = self.glow_surfaces['path' if (x+y) % 2 == 0 else 'start']
                     self.screen.blit(glow, glow.get_rect(center=rect.center))
 
@@ -163,7 +160,7 @@ class MazeVisualizer:
                            self.glow_surfaces[glow].get_rect(center=rect.center))
 
     def draw_path(self):
-        """Draw solution path with animated effects"""
+
         if not self.ui_state.current_path:
             return
 
@@ -225,7 +222,6 @@ class MazeVisualizer:
             self.draw_error_message()
 
     def draw_algorithm_dropdown(self, panel_rect: pygame.Rect):
-        """Draw dropdown menu for algorithm selection"""
         dropdown_height = len(self.ui_state.algorithms) * 30
         dropdown_rect = pygame.Rect(panel_rect.left + 10,
                                   panel_rect.top - dropdown_height - 10,
@@ -248,14 +244,14 @@ class MazeVisualizer:
             self.screen.blit(text, text.get_rect(center=option_rect.center))
 
     def draw_error_message(self):
-        """Draw error message with fade effect"""
+
         alpha = int(255 * min(1.0, self.ui_state.error_timer))
         text = self.font.render(self.ui_state.error_message, True, Colors.ERROR_COLOR)
         text.set_alpha(alpha)
         self.screen.blit(text, (SCREEN_SIZE//2 - text.get_width()//2, 20))
 
     def handle_events(self) -> bool:
-        """Handle user input events, returns False if should quit"""
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
@@ -269,7 +265,7 @@ class MazeVisualizer:
         return True
 
     def handle_mouse_click(self, pos: Tuple[int, int]):
-        """Handle mouse click events"""
+
         panel_rect = pygame.Rect(10, SCREEN_SIZE - 160, 200, 150)
         
         if panel_rect.collidepoint(pos):
@@ -292,7 +288,7 @@ class MazeVisualizer:
                 self.handle_algorithm_selection(pos[1] - dropdown_rect.top)
 
     def handle_algorithm_selection(self, y_offset: float):
-        """Handle algorithm selection from dropdown"""
+
         selected_index = int(y_offset // 30)
         if 0 <= selected_index < len(self.ui_state.algorithms):
             self.ui_state.selected_algorithm = self.ui_state.algorithms[selected_index]
@@ -301,7 +297,7 @@ class MazeVisualizer:
             self.ui_state.animation_progress = 0.0
 
     def update_hover_states(self, pos: Tuple[int, int]):
-        """Update button hover states based on mouse position"""
+
         panel_rect = pygame.Rect(10, SCREEN_SIZE - 160, 200, 150)
         self.ui_state.hover_buttons.clear()
         
@@ -315,7 +311,7 @@ class MazeVisualizer:
                 self.ui_state.hover_buttons.add(2)
 
     def solve_current_maze(self):
-        """Attempt to solve the current maze with selected algorithm"""
+
         if self.ui_state.solving:
             return
 
@@ -333,7 +329,7 @@ class MazeVisualizer:
             self.ui_state.show_error(f"Unexpected error: {str(e)}")
 
     def new_maze(self):
-        """Generate a new maze and reset visualization state"""
+
         self.maze = self.generate_maze()
         self.ui_state.current_path = None
         self.ui_state.animation_progress = 0.0
@@ -341,7 +337,7 @@ class MazeVisualizer:
         self.ui_state.error_message = None
 
     def run(self):
-        """Main program loop with proper error handling"""
+
         try:
             running = True
             while running:
