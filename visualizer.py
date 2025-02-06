@@ -65,7 +65,7 @@ class MazeVisualizer:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_SIZE, SCREEN_SIZE))
-        pygame.display.set_caption("Enhanced Maze Solver")
+        pygame.display.set_caption("Path Finders Visualizer")
         self.clock = pygame.time.Clock()
         
         # Load and scale fonts

@@ -1,6 +1,10 @@
 # PathFinders
  This project is a visually engaging and interactive program that generates random mazes and allows usthe user to solve them using a variety of pathfinding algorithms.
 
+# Demo 
+![Demo](/PathFinderDemo.gif)
+
+
 ## Features
 
 - **Random Maze Generation**
